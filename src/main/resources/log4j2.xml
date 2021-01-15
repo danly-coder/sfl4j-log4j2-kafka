@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--日志级别以及优先级排序: OFF > FATAL > ERROR > WARN > INFO > DEBUG > TRACE > ALL -->
+<!--如果设置级别为INFO，则优先级大于等于INFO级别（如：INFO、WARN、ERROR）的日志信息将可以被输出,小于该级别的如：DEBUG将不会被输出 -->
+<!-- status指定全局日志等级(可能会被loggers的root level覆盖) -->
+<!--monitorInterval：Log4j能够自动检测修改配置文件和重新配置本身，设置间隔秒数 -->
+<Configuration monitorInterval="30">
+    <Appenders>
+        <!--这个输出控制台的配置 -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <!--ThresholdFilter过滤器,这里指定接受的日志级别,低于该级别的日志直接丢弃,但级别比loggers的root和level覆盖 -->
+            <ThresholdFilter level="debug" onMatch="ACCEPT" onMismatch="DENY" />
+            <!--定义标准输出的日志格式(SYSTEM_OUT)，%d: 表示日期，%level:表示日志级别，%-5level,表示5个占位符，%t: 方法名，%m: 消息体(即我们填的信息)，%C: 包名 (%F: 类文件名,这里没加)-->
+             <PatternLayout pattern="[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%-5level] %l %logger{36} - %msg%n" />
+        </Console>
+        <!--定义输出到指定位置的文件 -->
+        <File name="log" fileName="logs/log.log" append="true">
+            <ThresholdFilter level="info" onMatch="ACCEPT"  onMismatch="DENY" />
+            <!--输出日志的格式 -->
+            <PatternLayout pattern="[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%-5level] %l %logger{36} - %msg%n" />
+        </File>
+        <!--输出到kafka-->
+        <kafka name="Kafka" topic="error-log" >
+            <ThresholdFilter level="warn" onMatch="ACCEPT"  onMismatch="DENY" />
+            <PatternLayout pattern="[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%-5level] %l %logger{36} - %msg%n" />
+            <Property name="bootstrap.servers">localhost:9092</Property>
+            <Property name="timeout.ms">10000</Property>
+        </kafka>
+        <!--kafka存取异步-->
+        <Async name="Async">
+            <AppenderRef ref="Kafka"/>
+        </Async>
+         <!--
+           滚动更新,即当日志文件尺寸大于SizeBasedTriggeringPolicy size时,就新建一个filePattern指定命名格式的日志文件
+           DefaultRolloverStrategy max指定最多新建日志文件的个数
+           fileName指定的是最新的日志信息文件名
+         -->
+        <RollingFile name="RollingFileInfo" fileName="logs/info.log" filePattern="logs/$${date:yyyy-MM}/info-%d{yyyy-MM-dd}-%i.log">
+            <!--控制台只输出level及以上级别的信息（onMatch），其他的直接拒绝（onMismatch） -->
+            <ThresholdFilter level="info" onMatch="ACCEPT" onMismatch="DENY" />
+            <PatternLayout
+                    pattern="[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%-5level] %l %logger{36} - %msg%n" />
+            <Policies>
+                <TimeBasedTriggeringPolicy />
+                <SizeBasedTriggeringPolicy size="100 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="30" />
+        </RollingFile>
+
+        <RollingFile name="RollingFileError" fileName="logs/error.log" filePattern="logs/$${date:yyyy-MM}/error-%d{yyyy-MM-dd}-%i.log">
+            <!--控制台只输出level及以上级别的信息（onMatch），其他的直接拒绝（onMismatch） -->
+            <ThresholdFilter level="error" onMatch="ACCEPT" onMismatch="DENY" />
+            <PatternLayout
+                    pattern="[%d{yyyy-MM-dd HH:mm:ss.SSS}] [%-5level] %l %logger{36} - %msg%n" />
+            <Policies>
+                <TimeBasedTriggeringPolicy />
+                <SizeBasedTriggeringPolicy size="100 MB" />
+            </Policies>
+            <DefaultRolloverStrategy max="30" />
+        </RollingFile>
+    </Appenders>
+    <!--只有定义了logger并引入的appender，appender才会生效 -->
+    <loggers>
+        <root level="info">
+            <AppenderRef  ref="Console"  />
+            <AppenderRef  ref="log" />
+            <AppenderRef  ref="RollingFileInfo" />
+            <AppenderRef  ref="RollingFileError" />
+            <AppenderRef  ref="Kafka" />
+        </root>
+        <Logger name="kafkaLog" level="warn">
+            <Logger name="org.apache.kafka" level="WARN" />
+        </Logger>
+    </loggers>
+<!--    能影响到输出的有ThresholdFilter level,logger level, root level-->
+<!--    最终的输出级别是max{ThresholdFilter level,logger level, root level}-->
+<!--    eg:某个Appender的ThresholdFilter level为debug,引用该Appender的logger的level为info,全局的root level为trace,-->
+<!--    最终这个logger的输出级别就为三个level中最高的,即info-->
+<!--    logger level最大,root level其次,ThresholdFilter level最小-->
+
+</Configuration>
